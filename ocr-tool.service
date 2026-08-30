@@ -1,0 +1,14 @@
+[Unit]
+Description=OCR Order Image Web Tool
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ocr_tool
+ExecStart=/opt/ocr_tool/.venv/bin/python /opt/ocr_tool/webapp.py --no-browser
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

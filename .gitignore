@@ -1,0 +1,31 @@
+# Windows/Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Local virtual environments and vendored dependencies
+.venv/
+vendor/
+
+# Runtime data and generated outputs
+tmp/
+tmp_uploads/
+results/
+dist/
+
+# Local test artifacts
+_test_webapp.py
+test_images/
+test_images2/
+test_json/
+result.csv
+result.json
+
+# Local order exports and user data
+*.xls
+*.xlsx
+*.csv
+*.json
+
+# Keep the source sample images, but ignore generated ZIP files
+*.zip

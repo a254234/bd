@@ -1,0 +1,7 @@
+rapidocr>=2.0
+onnxruntime>=1.16
+pillow>=9.0
+flask>=3.0
+pandas>=2.0
+xlrd>=2.0
+openpyxl>=3.1

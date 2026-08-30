@@ -1,0 +1,8 @@
+# 清华镜像安装: python -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+rapidocr>=2.0
+onnxruntime>=1.16
+pillow>=9.0
+
+# 可选：PaddleOCR 引擎（rapidocr 不可用时脚本会自动尝试）
+# paddlepaddle
+# paddleocr

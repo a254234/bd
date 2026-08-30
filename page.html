@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>订单图片识别与重命名</title>
+<style>
+:root{--blue:#2563eb;--green:#16a34a;--red:#dc2626;--bg:#f3f4f6;--border:#e5e7eb}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:#1f2937}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:24px;margin:8px 0 4px}
+.sub{color:#6b7280;margin:0 0 20px;font-size:14px}
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.field{margin-bottom:18px}
+.field label{display:block;font-weight:600;margin-bottom:8px}
+.file-box{border:2px dashed #cbd5e1;border-radius:10px;padding:18px;text-align:center;cursor:pointer;transition:.15s}
+.file-box:hover,.file-box.over{border-color:var(--blue);background:#eff6ff}
+.file-box input{display:none}
+.file-box .tip{color:#9ca3af;font-size:13px}
+.hint{margin-top:8px;font-size:13px;color:#4b5563;word-break:break-all}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.select,.text{border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;background:#fff}
+.text{width:280px}
+.actions{margin-top:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+button{border:0;border-radius:8px;padding:10px 22px;font-size:15px;cursor:pointer}
+#btnRun{background:var(--blue);color:#fff}
+#btnRun:disabled{opacity:.5;cursor:not-allowed}
+#btnDownload{background:var(--green);color:#fff}
+#status{color:#6b7280;font-size:14px}
+.hidden{display:none!important}
+.error{margin-top:16px;background:#fef2f2;border:1px solid #fecaca;color:var(--red);border-radius:10px;padding:12px 16px;font-size:14px;white-space:pre-wrap}
+table{width:100%;margin-top:20px;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+th,td{border:1px solid var(--border);padding:8px 10px;font-size:13px;text-align:left;vertical-align:top}
+th{background:#f8fafc;white-space:nowrap}
+tr.ok{background:#f0fdf4}
+tr.fail{background:#fff7ed}
+tr.dup{background:#f9fafb}
+.badge{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;white-space:nowrap}
+.badge.ok{background:#dcfce7;color:#15803d}
+.badge.fail{background:#ffedd5;color:#c2410c}
+.badge.dup{background:#e5e7eb;color:#4b5563}
+.name-new{color:#15803d;font-weight:600;word-break:break-all}
+details{margin-top:6px}
+summary{cursor:pointer;color:var(--blue);font-size:12px}
+pre{margin:6px 0 0;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;white-space:pre-wrap;word-break:break-all;max-height:160px;overflow:auto}
+@media (max-width:720px){th,td{padding:6px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>订单图片识别与重命名</h1>
+  <p class="sub">上传「订单数据表」和「订单图片」，自动完成 OCR 识别 → 字段提取 → 订单匹配，最后下载改名后的图片 ZIP。</p>
+
+  <div class="card">
+    <div class="field">
+      <label>① 订单数据表（.xls / .xlsx）</label>
+      <div class="file-box" onclick="document.getElementById('table').click()">
+        <input type="file" id="table" accept=".xls,.xlsx">
+        <div class="tip">点击选择订单数据表文件</div>
+      </div>
+      <div class="hint" id="tableName"></div>
+    </div>
+
+    <div class="field">
+      <label>② 匹配平台（可选，缩小匹配范围）</label>
+      <div class="row">
+        <select id="platform" class="select">
+          <option value="">不限平台</option>
+          <option value="美团外卖">美团外卖</option>
+          <option value="淘宝闪购">淘宝闪购</option>
+          <option value="其他">其他</option>
+        </select>
+        <input type="text" id="platformOther" class="text hidden" placeholder="请输入平台名称，例如：京东到家">
+      </div>
+      <div class="hint">选择后只在该平台的订单里匹配；选「其他」并填写名称时按名称匹配，不填写时匹配除美团外卖/淘宝闪购之外的订单。</div>
+    </div>
+
+    <div class="field">
+      <label>③ 订单图片（可多选，也可直接拖入）</label>
+      <div class="file-box" id="imgBox" onclick="document.getElementById('images').click()">
+        <input type="file" id="images" accept="image/*" multiple>
+        <div class="tip">点击选择，或把图片拖到这里</div>
+      </div>
+      <div class="hint" id="imgNames"></div>
+    </div>
+
+    <div class="actions">
+      <button id="btnRun" onclick="run()">开始处理</button>
+      <button id="btnDownload" class="hidden" onclick="downloadZip()">下载结果 ZIP</button>
+      <span id="status"></span>
+    </div>
+  </div>
+
+  <div id="error" class="error hidden"></div>
+
+  <table id="result" class="hidden">
+    <thead>
+      <tr>
+        <th>原文件名</th><th>新文件名</th><th>匹配方式</th><th>手机号</th><th>订单号</th>
+        <th>下单时间</th><th>来源平台</th><th>原流水号</th><th>识别原文</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let sessionId = '';
+let pickedImages = [];
+
+$('table').addEventListener('change', () => {
+  const f = $('table').files[0];
+  $('tableName').textContent = f ? ('已选择：' + f.name) : '';
+});
+
+$('platform').addEventListener('change', () => {
+  const isOther = $('platform').value === '其他';
+  $('platformOther').classList.toggle('hidden', !isOther);
+  if (isOther) $('platformOther').focus();
+});
+
+$('images').addEventListener('change', () => {
+  pickedImages = Array.from($('images').files);
+  renderImgNames();
+});
+
+['dragenter', 'dragover'].forEach(ev => $('imgBox').addEventListener(ev, e => {
+  e.preventDefault();
+  $('imgBox').classList.add('over');
+}));
+['dragleave', 'drop'].forEach(ev => $('imgBox').addEventListener(ev, e => {
+  e.preventDefault();
+  $('imgBox').classList.remove('over');
+}));
+$('imgBox').addEventListener('drop', e => {
+  const fs = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  if (fs.length) {
+    pickedImages = pickedImages.concat(fs);
+    renderImgNames();
+  }
+});
+
+function renderImgNames() {
+  $('imgNames').textContent = pickedImages.length
+    ? ('已选择 ' + pickedImages.length + ' 张：' + pickedImages.map(f => f.name).join('、'))
+    : '';
+}
+
+function showError(msg) {
+  const el = $('error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function hideError() { $('error').classList.add('hidden'); }
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+async function run() {
+  const table = $('table').files[0];
+  if (!table) { showError('请先选择订单数据表。'); return; }
+  const files = pickedImages.length ? pickedImages : Array.from($('images').files);
+  if (!files.length) { showError('请先选择图片。'); return; }
+  hideError();
+  const fd = new FormData();
+  fd.append('table', table);
+  fd.append('platform', $('platform').value);
+  fd.append('platform_other', $('platformOther').value);
+  files.forEach(f => fd.append('images', f));
+  const btn = $('btnRun');
+  btn.disabled = true;
+  $('status').textContent = '正在识别，请稍候（图片越多越慢）…';
+  $('btnDownload').classList.add('hidden');
+  try {
+    const resp = await fetch('/api/process', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!data.ok) { showError(data.error || '处理失败。'); return; }
+    sessionId = data.session;
+    render(data);
+    $('btnDownload').classList.remove('hidden');
+    const dupNote = data.duplicates ? ('（跳过重复 ' + data.duplicates + ' 张）') : '';
+    $('status').textContent = '处理完成：匹配成功 ' + data.matched + ' / 共 ' + data.total + ' 张' + dupNote + '。';
+  } catch (e) {
+    showError('请求失败：' + e);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function render(data) {
+  const tb = $('result').querySelector('tbody');
+  tb.innerHTML = '';
+  for (const r of data.rows) {
+    const tr = document.createElement('tr');
+    tr.className = r.new_name ? 'ok' : (r.dup_of ? 'dup' : 'fail');
+    const fields = r.fields || {};
+    const nameCell = r.new_name
+      ? ('<span class="name-new">' + esc(r.new_name) + '</span>')
+      : (r.dup_of
+        ? '<span class="badge dup">已跳过</span>'
+        : '<span class="badge fail">未匹配（保持原名）</span>');
+    const method = r.error
+      ? ('<span class="badge fail">' + esc(r.error) + '</span>')
+      : (r.dup_of
+        ? ('<span class="badge dup">重复' + (r.dup_kind === '订单' ? '订单' : '图片') + '：与 ' + esc(r.dup_of) + ' 相同</span>')
+        : ('<span class="badge ' + (r.new_name ? 'ok' : 'fail') + '">' + esc(r.method)
+          + (r.hit_count > 1 ? ('（命中 ' + r.hit_count + ' 行）') : '') + '</span>'));
+    const detail = r.text
+      ? ('<details><summary>查看 OCR 原文</summary><pre>' + esc(r.text) + '</pre></details>')
+      : '';
+    tr.innerHTML =
+      '<td>' + esc(r.file) + '</td>' +
+      '<td>' + nameCell + '</td>' +
+      '<td>' + method + '</td>' +
+      '<td>' + esc(fields['手机号']) + '</td>' +
+      '<td>' + esc(fields['订单号']) + '</td>' +
+      '<td>' + esc(fields['下单时间']) + '</td>' +
+      '<td>' + esc(r.platform) + '</td>' +
+      '<td>' + esc(r.serial) + '</td>' +
+      '<td>' + detail + '</td>';
+    tb.appendChild(tr);
+  }
+  $('result').classList.remove('hidden');
+  $('result').scrollIntoView({ behavior: 'smooth' });
+}
+
+function downloadZip() {
+  if (sessionId) location.href = '/api/download/' + sessionId;
+}
+</script>
+</body>
+</html>
